@@ -1,0 +1,6 @@
+# Bảo mật - KHÔNG đẩy lên GitHub
+.env
+temp_files/
+*.pyc
+__pycache__/
+*.log
