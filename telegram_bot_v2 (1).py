@@ -5,6 +5,8 @@ import logging
 import asyncio
 import requests
 import tempfile
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
@@ -1015,6 +1017,37 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # MAIN
 # ═══════════════════════════════════════════════
 
+# ═══════════════════════════════════════════════
+# KEEP-ALIVE SERVER (giữ bot không ngủ trên Render)
+# ═══════════════════════════════════════════════
+
+class KeepAliveHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot dang chay!")
+    def log_message(self, format, *args):
+        pass  # tắt log HTTP rác
+
+def chay_web_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), KeepAliveHandler)
+    server.serve_forever()
+
+def tu_ping_bot():
+    """Tự ping chính mình mỗi 10 phút để không bị ngủ"""
+    import time
+    url = os.environ.get("RENDER_EXTERNAL_URL", "")
+    if not url:
+        return
+    while True:
+        time.sleep(600)  # 10 phút
+        try:
+            requests.get(url, timeout=10)
+            print("✅ Ping keep-alive OK")
+        except:
+            pass
+
 def main():
     print("=" * 50)
     print("🚀 TIỆM TRUYỆN NHỎ NHỎ – v2.0")
@@ -1025,6 +1058,15 @@ def main():
     print("✅ Lịch đăng video")
     print("✅ Phân tích đối thủ")
     print("=" * 50)
+
+    # Khởi động web server (cần cho Render)
+    t1 = threading.Thread(target=chay_web_server, daemon=True)
+    t1.start()
+    print(f"✅ Web server đang chạy (giữ bot không ngủ)")
+
+    # Tự ping để không bị sleep
+    t2 = threading.Thread(target=tu_ping_bot, daemon=True)
+    t2.start()
 
     app = Application.builder().token(TELEGRAM_TOKEN).build()
 
